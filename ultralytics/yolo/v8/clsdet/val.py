@@ -42,7 +42,7 @@ class DetclsValidator(BaseValidator):
         """Preprocesses batch of images for YOLO training."""
         batch["img"] = batch["img"].to(self.device, non_blocking=True)
         batch["img"] = (batch["img"].half() if self.args.half else batch["img"].float()) / 255
-        for k in ["batch_idx", "cls_obj","cls_color", "bboxes"]:
+        for k in ["batch_idx", "cls_obj","cls_color", "bboxes"]: #khai have a some problem in batch_idx 
             batch[k] = batch[k].to(self.device)
 
         if self.args.save_hybrid:
@@ -60,7 +60,8 @@ class DetclsValidator(BaseValidator):
         return batch
     
     def init_metrics(self, model):
-    
+        self.stats = dict(tp=[], conf=[], pred_cls=[], target_cls=[], target_img=[])
+        
     def get_desc_det(self):
         return ('%22s' + '%11s' * 6) % ('Class', 'Images', 'Instances', 'Box(P', 'R', 'mAP50', 'mAP50-95)')
 

@@ -364,19 +364,18 @@ def polygons2masks_overlap(imgsz, segments, downsample_ratio=1):
 
 
 def find_dataset_yaml(path: Path) -> Path:
-    """
-    Find and return the YAML file associated with a Detect, Segment or Pose dataset.
+        # Find and return the YAML file associated with a Detect, Segment or Pose dataset.
 
-    This function searches for a YAML file at the root level of the provided directory first, and if not found, it
-    performs a recursive search. It prefers YAML files that have the same stem as the provided path. An AssertionError
-    is raised if no YAML file is found or if multiple YAML files are found.
+        # This function searches for a YAML file at the root level of the provided directory first, and if not found, it
+        # performs a recursive search. It prefers YAML files that have the same stem as the provided path. An AssertionError
+        # is raised if no YAML file is found or if multiple YAML files are found.
 
-    Args:
-        path (Path): The directory path to search for the YAML file.
+        # Args:
+        #     path (Path): The directory path to search for the YAML file.
 
-    Returns:
-        (Path): The path of the found YAML file.
-    """
+        # Returns:
+        #     (Path): The path of the found YAML file.
+    
     files = list(path.glob("*.yaml")) or list(path.rglob("*.yaml"))  # try root level first and then recursive
     assert files, f"No YAML file found in '{path.resolve()}'"
     if len(files) > 1:
@@ -384,22 +383,21 @@ def find_dataset_yaml(path: Path) -> Path:
     assert len(files) == 1, f"Expected 1 YAML file in '{path.resolve()}', but found {len(files)}.\n{files}"
     return files[0]
 
-
 def check_det_dataset(dataset, autodownload=True):
-    """
-    Download, verify, and/or unzip a dataset if not found locally.
+    
+        # Download, verify, and/or unzip a dataset if not found locally.
 
-Chức năng này kiểm tra tính khả dụng của một bộ dữ liệu được chỉ định và nếu không tìm thấy, nó có tùy chọn tải xuống và
-Giải nén bộ dữ liệu.Sau đó, nó đọc và phân tích dữ liệu YAML đi kèm, đảm bảo các yêu cầu chính được đáp ứng và cả
-Giải quyết các đường dẫn liên quan đến bộ dữ liệu.
+        # Chức năng này kiểm tra tính khả dụng của một bộ dữ liệu được chỉ định và nếu không tìm thấy, nó có tùy chọn tải xuống và
+        # Giải nén bộ dữ liệu.Sau đó, nó đọc và phân tích dữ liệu YAML đi kèm, đảm bảo các yêu cầu chính được đáp ứng và cả
+        # Giải quyết các đường dẫn liên quan đến bộ dữ liệu.
 
-    Args:
-        dataset (str): Path to the dataset or dataset descriptor (like a YAML file).
-        autodownload (bool, optional): Whether to automatically download the dataset if not found. Defaults to True.
+        # Args:
+        #     dataset (str): Path to the dataset or dataset descriptor (like a YAML file).
+        #     autodownload (bool, optional): Whether to automatically download the dataset if not found. Defaults to True.
 
-    Returns:
-        (dict): Parsed dataset information and paths.
-    """
+        # Returns:
+        #     (dict): Parsed dataset information and paths.
+    
 
     file = check_file(dataset)
 
@@ -478,7 +476,75 @@ Giải quyết các đường dẫn liên quan đến bộ dữ liệu.
 
     return data  # dictionary
 
+#khai 
+def check_multi_dataset(dataset):
+    data = yaml_load(file, append_filename = True)
+    for k in "train","val":
+        if k not in data:
+            if k != "val" or "validation" not in data:
+                raise SyntaxError(
+                    f"{dataset} '{k}:'key missing ❌.\n'train' and 'val' are required in all data YAMLs. "
+                )
+            LOGGER.info("WARNING ⚠️ renaming data YAML 'validation' key to 'val' to match YOLO format.")
+            data["val"] = data.pop("validation")  # đổi key 'validation' thành 'val'
+            
+    if "name_1" not in data and "name_2" not in data:
+            raise SyntaxError(f"{dataset} key missing ❌.\nEither 'name_1' (for classification) or 'name_2' (for detection) is required in all data YAMLs.")
+    
+    if "name_1" in data and "name_2" in data and len(data["name_1"]) != len(data["name_2"]):
+        raise SyntaxError(f"{dataset} 'name_1' length {len(data['name_1'])} and 'name_2: {len(data['name_2'])}' must match.")
+    
+    data["nc_1"] = len(data.get("name_1", []))
+    data["nc_2"] = len(data.get("name_2", []))
 
+    # Kiểm tra và xử lý tên các lớp
+    data["name_1"] = check_class_names(data.get("name_1", []))
+    data["name_2"] = check_class_names(data.get("name_2", []))    
+    
+    path = Path(extract_dir or data.get("path") or Path(data.get("yaml_file", "")).parent)  # dataset root
+    if not path.is_absolute():
+        path = (DATASETS_DIR / path).resolve()
+
+    data["path"] = path  # download scripts
+    for k in ["train", "val", "test"]:
+        if data.get(k):  # thêm đường dẫn
+            if isinstance(data[k], str):
+                x = (path / data[k]).resolve()
+                if not x.exists() and data[k].startswith("../"):
+                    x = (path / data[k][3:]).resolve()
+                data[k] = str(x)
+            else:
+                data[k] = [str((path / x).resolve()) for x in data[k]]
+
+    # Phân tích YAML
+    val, s = (data.get(x) for x in ("val", "download"))
+    if val:
+        val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
+        if not all(x.exists() for x in val):
+            name = clean_url(dataset)  # dataset name without URL auth
+            m = f"\nDataset '{name}' images not found ⚠️, missing path '{[x for x in val if not x.exists()][0]}'"
+            if s and autodownload:
+                LOGGER.warning(m)
+            else:
+                m += f"\nNote dataset download directory is '{DATASETS_DIR}'. You can update this in '{SETTINGS_YAML}'"
+                raise FileNotFoundError(m)
+            t = time.time()
+            r = None  # success
+            if s.startswith("http") and s.endswith(".zip"):  # URL
+                safe_download(url=s, dir=DATASETS_DIR, delete=True)
+            elif s.startswith("bash "):  # bash script
+                LOGGER.info(f"Running {s} ...")
+                r = os.system(s)
+            else:  # python script
+                exec(s, {"yaml": data})
+            dt = f"({round(time.time() - t, 1)}s)"
+            s = f"success ✅ {dt}, saved to {DATASETS_DIR}" if r in (0, None) else f"failure {dt} ❌"
+            LOGGER.info(f"Dataset download {s}\n")
+    
+    check_font("Arial.ttf" if is_ascii(data["name_1"]) else "Arial.Unicode.ttf")  # download fonts if needed
+
+    return data  # dictionary
+    
 def check_cls_dataset(dataset, split=""):
     """
     Checks a classification dataset such as Imagenet.

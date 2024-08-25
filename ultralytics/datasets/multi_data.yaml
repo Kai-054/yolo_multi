@@ -2,6 +2,7 @@ path: ../dataset/multi_data
 train: train/images
 val: valid/images
 test: test/images 
+
 #have two object types_cars(van-mini)using classification and logo using detection
 # however i setup dataload with new format label : [cls1][cls2][bboxes] and cls1 is label for classify anf cls2 label for detection 
 
