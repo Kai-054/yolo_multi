@@ -52,10 +52,10 @@ def default_class_names(data=None):
 
 class AutoBackend(nn.Module):
     """
-    Handles dynamic backend selection for running inference using Ultralytics YOLO models.
+Xử lý lựa chọn phụ trợ động để chạy suy luận bằng cách sử dụng các mô hình Yolo Ultralytics.
 
-    The AutoBackend class is designed to provide an abstraction layer for various inference engines. It supports a wide
-    range of formats, each with specific naming conventions as outlined below:
+Lớp Autobackend được thiết kế để cung cấp một lớp trừu tượng cho các công cụ suy luận khác nhau.Nó hỗ trợ rộng
+Phạm vi của các định dạng, mỗi định dạng có quy ước đặt tên cụ thể như được nêu dưới đây:
 
         Supported Formats and Naming Conventions:
             | Format                | File Suffix      |
@@ -73,9 +73,8 @@ class AutoBackend(nn.Module):
             | TensorFlow Edge TPU   | *_edgetpu.tflite |
             | PaddlePaddle          | *_paddle_model   |
             | NCNN                  | *_ncnn_model     |
-
-    This class offers dynamic backend switching capabilities based on the input model format, making it easier to deploy
-    models across various platforms.
+Lớp này cung cấp các khả năng chuyển đổi phụ trợ động dựa trên định dạng mô hình đầu vào, giúp triển khai dễ dàng hơn
+mô hình trên các nền tảng khác nhau.
     """
 
     @torch.no_grad()
