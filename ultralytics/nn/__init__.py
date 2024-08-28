@@ -1,9 +1,8 @@
 # Ultralytics YOLO 🚀, AGPL-3.0 license
 
 from .tasks import (
-    BaseModel,
-    ClassificationModel,
-    DetectionModel,
+    MultiModel,
+    MultiBaseModel,
     attempt_load_one_weight,
     attempt_load_weights,
     guess_model_scale,
@@ -14,6 +13,8 @@ from .tasks import (
 )
 
 __all__ = (
+    "MultiModel",
+    "MultiBaseModel",   
     "attempt_load_one_weight",
     "attempt_load_weights",
     "parse_model",
@@ -21,7 +22,4 @@ __all__ = (
     "guess_model_task",
     "guess_model_scale",
     "torch_safe_load",
-    "DetectionModel",
-    "ClassificationModel",
-    "BaseModel",
 )

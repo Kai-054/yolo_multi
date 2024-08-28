@@ -5,39 +5,20 @@ from pathlib import Path
 from typing import Union
 
 from ultralytics import yolo  # noqa
-from ultralytics.nn.tasks import (ClassificationModel, DetectionModel, MultiModel, attempt_load_one_weight, guess_model_task, nn, yaml_model_load)
+from ultralytics.nn.tasks import ( MultiModel, attempt_load_one_weight, guess_model_task, nn, yaml_model_load)
 from ultralytics.yolo.cfg import get_cfg
-from ultralytics.yolo.engine.exporter import Exporter
+# from ultralytics.yolo.engine.exporter import Exporter
 from ultralytics.yolo.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks,
                                     is_git_dir, yaml_load)
 from ultralytics.yolo.utils.checks import check_file, check_imgsz, check_pip_update_available, check_yaml
 # from ultralytics.yolo.utils.downloads import GITHUB_ASSET_STEMS
 from ultralytics.yolo.utils.torch_utils import smart_inference_mode
 
-# Map head to model, trainer, validator, and predictor classes
-# TASK_MAP = {
-#     'classify': [
-#         ClassificationModel, yolo.v8.classify.ClassificationTrainer, yolo.v8.classify.ClassificationValidator,
-#         yolo.v8.classify.ClassificationPredictor],
-#     'detect': [
-#         DetectionModel, yolo.v8.detect.DetectionTrainer, yolo.v8.detect.DetectionValidator,
-#         yolo.v8.detect.DetectionPredictor],
-#     'segment': [
-#         SegmentationModel, yolo.v8.segment.SegmentationTrainer, yolo.v8.segment.SegmentationValidator,
-#         yolo.v8.segment.SegmentationPredictor],
-#     'pose': [PoseModel, yolo.v8.pose.PoseTrainer, yolo.v8.pose.PoseValidator, yolo.v8.pose.PosePredictor]}
 
 TASK_MAP = {
-    # 'classify': [
-    #     ClassificationModel, yolo.v8.classify.ClassificationTrainer, yolo.v8.classify.ClassificationValidator,
-    #     yolo.v8.classify.ClassificationPredictor],
-    'detect': [
-        DetectionModel, yolo.v8.detect.DetectionTrainer, yolo.v8.detect.DetectionValidator,
-        yolo.v8.detect.DetectionPredictor],
-    # 'pose': [PoseModel, yolo.v8.pose.PoseTrainer, yolo.v8.pose.PoseValidator, yolo.v8.pose.PosePredictor],
-    # 'multi': [
-    #     MultiModel, yolo.v8.DecSeg.DetectionSegmentationTrainer, yolo.v8.DecSeg.MultiValidator,
-    #     yolo.v8.DecSeg.MultiPredictor]
+    'multi': [
+        MultiModel, yolo.v8.DecSeg.DetectionSegmentationTrainer, yolo.v8.DecSeg.MultiValidator,
+        yolo.v8.DecSeg.MultiPredictor]
 }
 
 
@@ -83,13 +64,14 @@ class YOLO:
     """
 
     def __init__(self, model: Union[str, Path] = 'yolov8n.pt', task=None) -> None:
-        """
-        Initializes the YOLO model.
+        
+        
+        # Initializes the YOLO model.
 
-        Args:
-            model (Union[str, Path], optional): Path or name of the model to load or create. Defaults to 'yolov8n.pt'.
-            task (Any, optional): Task type for the YOLO model. Defaults to None.
-        """
+        # Args:
+        #     model (Union[str, Path], optional): Path or name of the model to load or create. Defaults to 'yolov8n.pt'.
+        #     task (Any, optional): Task type for the YOLO model. Defaults to None. 
+        
         self.callbacks = callbacks.get_default_callbacks()
         self.predictor = None  # reuse predictor
         self.model = None  # model object
@@ -214,6 +196,7 @@ class YOLO:
         return self
 
     def info(self, detailed=False, verbose=True):
+        
         """
         Logs model info.
 
@@ -332,24 +315,24 @@ class YOLO:
         overrides = {**DEFAULT_CFG_DICT, **overrides}  # fill in missing overrides keys with defaults
         return benchmark(model=self, imgsz=overrides['imgsz'], half=overrides['half'], device=overrides['device'])
 
-    def export(self, **kwargs):
-        """
-        Export model.
+    # def export(self, **kwargs):
+    #     """
+    #     Export model.
 
-        Args:
-            **kwargs : Any other args accepted by the predictors. To see all args check 'configuration' section in docs
-        """
-        self._check_is_pytorch_model()
-        overrides = self.overrides.copy()
-        overrides.update(kwargs)
-        overrides['mode'] = 'export'
-        args = get_cfg(cfg=DEFAULT_CFG, overrides=overrides)
-        args.task = self.task
-        if args.imgsz == DEFAULT_CFG.imgsz:
-            args.imgsz = self.model.args['imgsz']  # use trained imgsz unless custom value is passed
-        if args.batch == DEFAULT_CFG.batch:
-            args.batch = 1  # default to 1 if not modified
-        return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)
+    #     Args:
+    #         **kwargs : Any other args accepted by the predictors. To see all args check 'configuration' section in docs
+    #     """
+    #     self._check_is_pytorch_model()
+    #     overrides = self.overrides.copy()
+    #     overrides.update(kwargs)
+    #     overrides['mode'] = 'export'
+    #     args = get_cfg(cfg=DEFAULT_CFG, overrides=overrides)
+    #     args.task = self.task
+    #     if args.imgsz == DEFAULT_CFG.imgsz:
+    #         args.imgsz = self.model.args['imgsz']  # use trained imgsz unless custom value is passed
+    #     if args.batch == DEFAULT_CFG.batch:
+    #         args.batch = 1  # default to 1 if not modified
+    #     return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)
 
     def train(self, **kwargs):
         """

@@ -409,6 +409,24 @@ def xyxy2xywh(x):
     return y
 
 
+def xyn2xy(x, w=640, h=640, padw=0, padh=0):
+    """
+    Convert normalized coordinates to pixel coordinates of shape (n,2)
+
+    Args:
+        x (np.ndarray) or (torch.Tensor): The input tensor of normalized bounding box coordinates
+        w (int): The width of the image. Defaults to 640
+        h (int): The height of the image. Defaults to 640
+        padw (int): The width of the padding. Defaults to 0
+        padh (int): The height of the padding. Defaults to 0
+    Returns:
+        y (np.ndarray) or (torch.Tensor): The x and y coordinates of the top left corner of the bounding box
+    """
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[..., 0] = w * x[..., 0] + padw  # top left x
+    y[..., 1] = h * x[..., 1] + padh  # top left y
+    return y
+
 def xywh2xyxy(x):
     """
     Convert bounding box coordinates from (x, y, width, height) format to (x1, y1, x2, y2) format where (x1, y1) is the

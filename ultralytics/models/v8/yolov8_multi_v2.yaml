@@ -27,7 +27,7 @@ backbone:
   - [-1, 1, SPPF, [1024, 5]] # 9
 
 # YOLOv8.0n head
-head_1:
+head:
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
   - [[-1, 6], 1, Concat, [1]] # cat backbone P4
   - [-1, 3, C2f, [512]] # 12
@@ -45,6 +45,3 @@ head_1:
   - [-1, 3, C2f, [1024]] # 21 (P5/32-large)
 
   - [[15, 18, 21], 1, Detect, [nc]] # Detect(P3, P4, P5)
-
-head_2:
-  - [-1, 1, Classify, [nc_1]] # Classify
