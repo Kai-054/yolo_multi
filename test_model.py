@@ -6,7 +6,10 @@ model_pth = "/home/ubuntu/khai202/yolo_multi/ultralytics/models/v8/yolov8_multi.
 model_dict = yaml_model_load(model_pth)
 #  = img_pth 
 input_channels = 3
-model, save = MultiModel(model_dict, input_channels )
+model = MultiModel(model_dict, input_channels )
+# x = torch.randn(1, input_channels, 640, 640)
+# output = model(x)
+# print("Output:", output)
 
 # Kiểm tra kết quả
 print(model_dict)  # In ra cấu trúc của mô hình
