@@ -29,15 +29,33 @@ class Classify(nn.Module):
         self.drop = nn.Dropout(p=0.0, inplace=True)
         self.linear = nn.Linear(c_, c2)  # to x(b,c2)
         
+    # def forward(self, x):
+    #     # print(x)
+    #     """Thực hiện chuyển tiếp mô hình YOLO trên dữ liệu hình ảnh đầu vào."""
+    #     if isinstance(x, list):
+    #         print("value x.shape of classify",(x[0].shape), (x[0].dtype))
+    #         x = torch.cat(x, 1)
+    #     x = self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+    #     print ("value of x", x)
+    #     return x if self.training else x.softmax(1)
+    
     def forward(self, x):
-        # print(x)
         """Thực hiện chuyển tiếp mô hình YOLO trên dữ liệu hình ảnh đầu vào."""
         if isinstance(x, list):
-            print("value x.shape of classify",(x[0].shape))
-            x = torch.cat(x, 1)
+            print("value of x trc khi nối", x.shape, x.dtype )
+            # Kiểm tra các kích thước của từng tensor trong danh sách trước khi nối
+            for i, tensor in enumerate(x):
+                print(f"Tensor {i}: shape={tensor.shape}, dtype={tensor.dtype}")
+                
+            try:
+                x = torch.cat(x, 1)  
+            except RuntimeError as e:
+                print(f"RuntimeError khi nối các tensor: {e}")
+            
         x = self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
-        print ("value of x", x)
+        # print("Kết quả sau khi qua Classify:", x.shape, x.dtype)
         return x if self.training else x.softmax(1)
+
     
 class Detect(nn.Module):
     """YOLOv8 Detect head for detection models."""
@@ -66,13 +84,17 @@ class Detect(nn.Module):
     def forward(self, x):
         """Concatenates and returns predicted bounding boxes and class probabilities."""
         for i in range(self.nl):
+            # print(f"Layer {i} shape before cat: {x[i].shape}")
             x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
+            # print(f"Layer {i} shape after cat: {x[i].shape}")
         if self.training:  # Training path
         
             return x
 
         # Inference path
         shape = x[0].shape  # BCHW
+        print("value type of layer 22", shape)
+        # print("value shape detec", shape, x[1].shape, x[2].shape )
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
         if self.dynamic or self.shape != shape:
             self.anchors, self.strides = (x.transpose(0, 1) for x in make_anchors(x, self.stride, 0.5))

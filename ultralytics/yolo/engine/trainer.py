@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 from ultralytics.nn.tasks import attempt_load_one_weight, attempt_load_weights
 from ultralytics.yolo.cfg import get_cfg
-from ultralytics.yolo.data.utils import check_cls_dataset, check_det_dataset
+from ultralytics.yolo.data.utils import check_cls_dataset, check_multi_dataset
 from ultralytics.yolo.utils import (DEFAULT_CFG, LOGGER, ONLINE, RANK, ROOT, SETTINGS, TQDM_BAR_FORMAT, __version__,
                                     callbacks, clean_url, colorstr, emojis, yaml_save)
 from ultralytics.yolo.utils.autobatch import check_train_batch_size
@@ -54,7 +54,7 @@ class BaseTrainer:
         batch_size (int): Batch size for training.
         epochs (int): Number of epochs to train for.
         start_epoch (int): Starting epoch for training.
-        device (torch.device): Device to use for training. 
+        device (torch.device): Device to use for training.
         amp (bool): Flag to enable AMP (Automatic Mixed Precision).
         scaler (amp.GradScaler): Gradient scaler for AMP.
         data (str): Path to data.
@@ -118,13 +118,19 @@ class BaseTrainer:
         self.model = self.args.model
         try:
             if self.args.task == 'classify':
+                print("Checking classification dataset")
                 self.data = check_cls_dataset(self.args.data)
-            elif self.args.data.endswith('.yaml') or self.args.task in ('detect', 'segment'):
-                self.data = check_det_dataset(self.args.data)
+            elif self.args.data.endswith('.yaml') or self.args.task in ('multi'):
+                print("Checking multi dataset")
+                self.data = check_multi_dataset(self.args.data)
+                print("Dataset checked successfully")
                 if 'yaml_file' in self.data:
                     self.args.data = self.data['yaml_file']  # for validating 'yolo train data=url.zip' usage
+            print("Try block completed successfully")
         except Exception as e:
+            print(f"Error occurred: {e}")
             raise RuntimeError(emojis(f"Dataset '{clean_url(self.args.data)}' error ❌ {e}")) from e
+
 
         self.trainset, self.testset = self.get_dataset(self.data)
         self.ema = None
@@ -141,7 +147,7 @@ class BaseTrainer:
         self.loss_names = ['Loss']
         self.mul_loss = []
         self.mul_loss_items = []
-        self.subloss = [None for _ in range(len(self.data['labels_list']))]
+        # self.subloss = [None for _ in range(len(self.data['labels_list']))]
         self.csv = self.save_dir / 'results.csv'
         self.plot_idx = [0, 1, 2]
 
@@ -259,6 +265,7 @@ class BaseTrainer:
         self.stopper, self.stop = EarlyStopping(patience=self.args.patience), False
 
         # Dataloaders
+        #world_size training nhieu card  
         batch_size = self.batch_size // world_size if world_size > 1 else self.batch_size
         self.train_loader = self.get_dataloader(self.trainset, batch_size=batch_size, rank=RANK, mode='train')
         if RANK in (-1, 0):
@@ -353,13 +360,8 @@ class BaseTrainer:
                         if 'momentum' in x:
                             x['momentum'] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
 
+
                 # Forward
-                """
-                    preds[count]: Dự đoán của mô hình cho batch thứ count.
-                    batch[count]: Dữ liệu đầu vào tương ứng với batch thứ count.
-                    self.data['labels_list'][count]: Nhãn tương ứng với batch thứ count.
-                    count: Chỉ số hiện tại của batch trong vòng lặp.
-                """
                 with torch.cuda.amp.autocast(self.amp):
                     batch = self.preprocess_batch(batch)
                     self.mul_loss = [None for _ in range(len(batch))]
@@ -584,7 +586,7 @@ class BaseTrainer:
         """Get model and raise NotImplementedError for loading cfg files."""
         raise NotImplementedError("This task trainer doesn't support loading cfg files")
 
-    def get_validator(self): #khai it will call in train.py
+    def get_validator(self):
         """Returns a NotImplementedError when the get_validator function is called."""
         raise NotImplementedError('get_validator function not implemented in trainer')
 
@@ -598,7 +600,7 @@ class BaseTrainer:
         """Build dataset"""
         raise NotImplementedError('build_dataset function not implemented in trainer')
 
-    def criterion(self, preds, batch): #khai criterion overwrite in /home/ubuntu/khai202/yolov8_multi/ultralytics/yolo/v8/DecSeg/train.py
+    def criterion(self, preds, batch):
         """
         Returns loss and individual loss items as Tensor.
         """

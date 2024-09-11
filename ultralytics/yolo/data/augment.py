@@ -41,6 +41,7 @@ class Compose:
     def __repr__(self):
         """Returns a string representation of the object."""
         return f"{self.__class__.__name__}({', '.join([f'{t}' for t in self.transforms])})"
+    
 class RandomFlip:
     """
     Applies a random horizontal or vertical flip to an image with a given probability.
@@ -64,24 +65,22 @@ class RandomFlip:
     """
 
     def __init__(self, p=0.5, direction="horizontal", flip_idx=None) -> None:
-        """
-        Initializes the RandomFlip class with probability and direction.
+        # Initializes the RandomFlip class with probability and direction.
 
-        This class applies a random horizontal or vertical flip to an image with a given probability.
-        It also updates any instances (bounding boxes, keypoints, etc.) accordingly.
+        # This class applies a random horizontal or vertical flip to an image with a given probability.
+        # It also updates any instances (bounding boxes, keypoints, etc.) accordingly.
 
-        Args:
-            p (float): The probability of applying the flip. Must be between 0 and 1.
-            direction (str): The direction to apply the flip. Must be 'horizontal' or 'vertical'.
-            flip_idx (List[int] | None): Index mapping for flipping keypoints, if any.
+        # Args:
+        #     p (float): The probability of applying the flip. Must be between 0 and 1.
+        #     direction (str): The direction to apply the flip. Must be 'horizontal' or 'vertical'.
+        #     flip_idx (List[int] | None): Index mapping for flipping keypoints, if any.
 
-        Raises:
-            AssertionError: If direction is not 'horizontal' or 'vertical', or if p is not between 0 and 1.
+        # Raises:
+        #     AssertionError: If direction is not 'horizontal' or 'vertical', or if p is not between 0 and 1.
 
-        Examples:
-            >>> flip = RandomFlip(p=0.5, direction='horizontal')
-            >>> flip = RandomFlip(p=0.7, direction='vertical', flip_idx=[1, 0, 3, 2, 5, 4])
-        """
+        # Examples:
+        #     >>> flip = RandomFlip(p=0.5, direction='horizontal')
+        #     >>> flip = RandomFlip(p=0.7, direction='vertical', flip_idx=[1, 0, 3, 2, 5, 4])
         assert direction in {"horizontal", "vertical"}, f"Support direction `horizontal` or `vertical`, got {direction}"
         assert 0 <= p <= 1.0, f"The probability should be in range [0, 1], but got {p}."
 
@@ -90,29 +89,28 @@ class RandomFlip:
         self.flip_idx = flip_idx
 
     def __call__(self, labels):
-        """
-        Applies random flip to an image and updates any instances like bounding boxes or keypoints accordingly.
+        # Applies random flip to an image and updates any instances like bounding boxes or keypoints accordingly.
 
-        This method randomly flips the input image either horizontally or vertically based on the initialized
-        probability and direction. It also updates the corresponding instances (bounding boxes, keypoints) to
-        match the flipped image.
+        # This method randomly flips the input image either horizontally or vertically based on the initialized
+        # probability and direction. It also updates the corresponding instances (bounding boxes, keypoints) to
+        # match the flipped image.
 
-        Args:
-            labels (Dict): A dictionary containing the following keys:
-                'img' (numpy.ndarray): The image to be flipped.
-                'instances' (ultralytics.utils.instance.Instances): An object containing bounding boxes and
-                    optionally keypoints.
+        # Args:
+        #     labels (Dict): A dictionary containing the following keys:
+        #         'img' (numpy.ndarray): The image to be flipped.
+        #         'instances' (ultralytics.utils.instance.Instances): An object containing bounding boxes and
+        #             optionally keypoints.
 
-        Returns:
-            (Dict): The same dictionary with the flipped image and updated instances:
-                'img' (numpy.ndarray): The flipped image.
-                'instances' (ultralytics.utils.instance.Instances): Updated instances matching the flipped image.
+        # Returns:
+        #     (Dict): The same dictionary with the flipped image and updated instances:
+        #         'img' (numpy.ndarray): The flipped image.
+        #         'instances' (ultralytics.utils.instance.Instances): Updated instances matching the flipped image.
 
-        Examples:
-            >>> labels = {'img': np.random.rand(640, 640, 3), 'instances': Instances(...)}
-            >>> random_flip = RandomFlip(p=0.5, direction='horizontal')
-            >>> flipped_labels = random_flip(labels)
-        """
+        # Examples:
+        #     >>> labels = {'img': np.random.rand(640, 640, 3), 'instances': Instances(...)}
+        #     >>> random_flip = RandomFlip(p=0.5, direction='horizontal')
+        #     >>> flipped_labels = random_flip(labels)
+        
         img = labels["img"]
         instances = labels.pop("instances")
         instances.convert_bbox(format="xywh")
@@ -316,20 +314,20 @@ class RandomHSV:
     """
 
     def __init__(self, hgain=0.5, sgain=0.5, vgain=0.5) -> None:
-        """
-        Initializes the RandomHSV object for random HSV (Hue, Saturation, Value) augmentation.
+        # """
+        # Initializes the RandomHSV object for random HSV (Hue, Saturation, Value) augmentation.
 
-        This class applies random adjustments to the HSV channels of an image within specified limits.
+        # This class applies random adjustments to the HSV channels of an image within specified limits.
 
-        Args:
-            hgain (float): Maximum variation for hue. Should be in the range [0, 1].
-            sgain (float): Maximum variation for saturation. Should be in the range [0, 1].
-            vgain (float): Maximum variation for value. Should be in the range [0, 1].
+        # Args:
+        #     hgain (float): Maximum variation for hue. Should be in the range [0, 1].
+        #     sgain (float): Maximum variation for saturation. Should be in the range [0, 1].
+        #     vgain (float): Maximum variation for value. Should be in the range [0, 1].
 
-        Examples:
-            >>> hsv_aug = RandomHSV(hgain=0.5, sgain=0.5, vgain=0.5)
-            >>> augmented_image = hsv_aug(image)
-        """
+        # Examples:
+        #     >>> hsv_aug = RandomHSV(hgain=0.5, sgain=0.5, vgain=0.5)
+        #     >>> augmented_image = hsv_aug(image)
+        # """
         self.hgain = hgain
         self.sgain = sgain
         self.vgain = vgain
@@ -382,7 +380,7 @@ class BaseMixTransform:
         self.dataset = dataset
         self.pre_transform = pre_transform
         self.p = p
-    #khai custom 
+    # khai custom 
     def __call__(self, labels):
         """Applies pre-processing transforms and mixup/mosaic transforms to labels data."""
         if random.uniform(0, 1) > self.p:
@@ -1110,33 +1108,41 @@ class MixUp(BaseMixTransform):
         labels["cls_obj"] = np.concatenate([labels["cls_obj"], labels2["cls_obj"]], 0)
         return labels
     
-def v8_transforms_multi(dataset, imgsz, hyp, stretch=False):
+def v8_transforms(dataset, imgsz, hyp):
     """Convert images to a size suitable for YOLOv8 training."""
-    pre_transform = Compose(
-        [
-            Mosaic(dataset, imgsz=imgsz, p=hyp.mosaic),
-            CopyPaste(p=hyp.copy_paste),
-            RandomPerspective(
-                degrees=hyp.degrees,
-                translate=hyp.translate,
-                scale=hyp.scale,
-                shear=hyp.shear,
-                perspective=hyp.perspective,
-                pre_transform=None if stretch else LetterBox(new_shape=(imgsz, imgsz)),
-            ),
-        ]
-    )
-    return Compose(
-        [
-            pre_transform,
-            MixUp(dataset, pre_transform=pre_transform, p=hyp.mixup),
-            Albumentations(p=1.0),
-            RandomHSV(hgain=hyp.hsv_h, sgain=hyp.hsv_s, vgain=hyp.hsv_v),
-            RandomFlip(direction="vertical", p=hyp.flipud),
-            RandomFlip(direction="horizontal", p=hyp.fliplr),
-        ]
-    )  # transforms
+    print(type(dataset.data))
+
+    pre_transform = Compose([
+        Mosaic(dataset, imgsz=imgsz, p=hyp.mosaic),
+        CopyPaste(p=hyp.copy_paste),
+        RandomPerspective(
+            degrees=hyp.degrees,
+            translate=hyp.translate,
+            scale=hyp.scale,
+            shear=hyp.shear,
+            perspective=hyp.perspective,
+            pre_transform=LetterBox(new_shape=(imgsz, imgsz)),
+        )])
+    if isinstance(dataset.data, dict):
+        flip_idx = dataset.data.get('flip_idx', None)  # for keypoints augmentation
+    else:
+        flip_idx = None
+        LOGGER.warning("WARNING ⚠️ dataset.data is not a dictionary.")
     
+    # if dataset.use_keypoints and flip_idx is None and hyp.fliplr > 0.0:
+    #     hyp.fliplr = 0.0
+    #     LOGGER.warning("WARNING ⚠️ No `flip_idx` provided while training keypoints, setting augmentation 'fliplr=0.0'")
+    
+    return Compose([
+        pre_transform,
+        MixUp(dataset, pre_transform=pre_transform, p=hyp.mixup),
+        Albumentations(p=1.0),
+        RandomHSV(hgain=hyp.hsv_h, sgain=hyp.hsv_s, vgain=hyp.hsv_v),
+        RandomFlip(direction='vertical', p=hyp.flipud),
+        RandomFlip(direction='horizontal', p=hyp.fliplr, flip_idx=flip_idx)
+    ])  # transforms
+
+# khai custom     
 class Format:
     """
     Formats image annotations for object detection, instance segmentation, and pose estimation tasks. The class
@@ -1237,23 +1243,23 @@ class CopyPaste:
         self.p = p
 
     def __call__(self, labels):
-        """
-        Applies Copy-Paste augmentation to an image and its instances.
+        # """
+        # Applies Copy-Paste augmentation to an image and its instances.
 
-        Args:
-            labels (Dict): A dictionary containing:
-                - 'img' (np.ndarray): The image to augment.
-                - 'cls' (np.ndarray): Class labels for the instances.
-                - 'instances' (ultralytics.engine.results.Instances): Object containing bounding boxes, segments, etc.
+        # Args:
+        #     labels (Dict): A dictionary containing:
+        #         - 'img' (np.ndarray): The image to augment.
+        #         - 'cls' (np.ndarray): Class labels for the instances.
+        #         - 'instances' (ultralytics.engine.results.Instances): Object containing bounding boxes, segments, etc.
 
-        Returns:
-            (Dict): Dictionary with augmented image and updated instances under 'img', 'cls', and 'instances' keys.
+        # Returns:
+        #     (Dict): Dictionary with augmented image and updated instances under 'img', 'cls', and 'instances' keys.
 
-        Examples:
-            >>> labels = {'img': np.random.rand(640, 640, 3), 'cls': np.array([0, 1, 2]), 'instances': Instances(...)}
-            >>> augmenter = CopyPaste(p=0.5)
-            >>> augmented_labels = augmenter(labels)
-        """
+        # Examples:
+        #     >>> labels = {'img': np.random.rand(640, 640, 3), 'cls': np.array([0, 1, 2]), 'instances': Instances(...)}
+        #     >>> augmenter = CopyPaste(p=0.5)
+        #     >>> augmented_labels = augmenter(labels)
+        # """
         im = labels["img"]
         cls_obj = labels["cls_obj"]
         cls_color = labels["cls_color"]

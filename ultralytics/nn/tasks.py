@@ -1,6 +1,7 @@
 import contextlib
 from copy import deepcopy
 from pathlib import Path
+from itertools import chain
 
 import torch
 import torch.nn as nn
@@ -40,100 +41,66 @@ class MultiBaseModel(nn.Module):
             
         return self._forward_once(x, profile, visualize)
     
-    # def _forward_once(self, x, profile=False, visualize=False):
-    #     """
-    #     Đầu ra này sẽ trả về kết quả toàn bộ. Trình tự là phát hiện vật thể, phân đoạn khu vực có thể lái xe và phân đoạn làn đường.
-    #     This output will return whole head result. the sequence is object detection, drivable area seg and lane seg. 
-    #     """
-    #     outputs, y = [], []
-    #     for m in self.model:# m dai dien cho 1 layer 
-    #         if m.f != -1:  # if not from previous layer
-    #             x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
-    #         x = m(x)  # run
-
-    #         if isinstance(m, (Detect, Classify)):  # if it's a task head
-    #             outputs.append(x)
-    #         # y.append(x)
-    #         y.append(x if m.i in self.save else None)  # save output
-    #         if visualize:
-    #             feature_visualization(x, m.type, m.i, save_dir=visualize)
-    #     return outputs
     def _forward_once(self, x, profile=False, visualize=False):
         """
         Đầu ra này sẽ trả về kết quả toàn bộ. Trình tự là phát hiện vật thể, phân đoạn khu vực có thể lái xe và phân đoạn làn đường.
         This output will return whole head result. The sequence is object detection, drivable area seg, and lane seg.
         """
         outputs, y = [], []
-        output_l7_bb = None
+        output_l7_bb = []
         # print ("outputs=", outputs)
         # print("Y=================", y)
         # exit()
 
-        for m in self.model:  # m đại diện cho 1 layer
-            if m.f != -1:  # nếu không phải từ lớp trước
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
-            x = m(x)  # run
+        for m in (self.model):  # m đại diện cho 1 layer
             
-            if m.i == 7:
-               output_l7_bb = x 
+            if m.f != -1:  # nếu không phải từ lớp trước
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers           
+            # if m.i == 8:
+            #    output_l7_bb = x
+            #    print("value type of output l7 ",output_l7_bb.shape, type(output_l7_bb) )
+            #    print(f"Shape of output_l7_bb at layer {m.i}: {output_l7_bb[0].shape}")
+            # print(x)
+            x = m(x)  # runx}, type={output_l7_bb[0].dtype}")
+            # print ("type of x",type(x))
+            
+            # if isinstance(x, torch.Tensor):
+            #     print(f"Layer {m.i}: Output is a single tensor with shape: {x.shape}")
+                
 
-            print(f"Layer {m.i} ({m.type}): shape={x[0].shape}, type={x[0].dtype}")
-
-            if isinstance(m, (Detect, Classify)):  # if it's a task head
+            # print(f"Layer {m.i} ({m.type}): shape={x[0].shape}, type={x[0].dtype}")
+            if isinstance(m,Detect):  # if it's a task head
                 outputs.append(x)
+                
+                
+            # elif isinstance(m, Classify):
+            #     print("m thuộc head classify")
+            #     class_results = m(output_l7_bb)
+            #     outputs.append(class_results)
+            #     print("Classify head output shape:", class_results.shape)
+            #     print(outputs)
+            #     exit() #bug 
             y.append(x if m.i in self.save else None)  # save output
-
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
-        for m in self.model:
-            if isinstance(m, classify):
-                class_results=m(output_l7_bb)
+        
+        for m in (self.head_2):
+            if m.i == 8:
+               output_l7_bb = x
+               print("l7 shape:", output_l7_bb.shape)
+               
+            if isinstance(m, Classify):
+                print("m thuộc head classify")
+                
+                class_results = m(output_l7_bb)
+                
                 outputs.append(class_results)
-                break
-        
-        
-    #     # Kết hợp kết quả từ detection và classification
-        detec_results, class_results = outputs[0], outputs[1]
-        combined_results = self.combine_results(detec_results, class_results)
-        print("Final detection results shape:", detec_results.shape)
-        print("Final classification results shape:", class_results.shape)
+                print("Classify head output shape:", class_results.shape)
+                print(type(outputs) )
+                exit() #bug 
+            
+        return outputs
 
-
-        return combined_results
-
-    # Các phương thức còn lại giữ nguyên như ban đầu
-    
-    def combine_results(self, detec_results, class_results):
-        return {
-            "detection": detec_results,
-            "classification": class_results
-        }
-        
-    def _profile_one_layer(self, m, x, dt):
-        """
-        Profile the computation time and FLOPs of a single layer of the model on a given input.
-        Appends the results to the provided list.
-
-        Args:
-            m (nn.Module): The layer to be profiled.
-            x (torch.Tensor): The input data to the layer.
-            dt (list): A list to store the computation time of the layer.
-
-        Returns:
-            None
-        """
-        c = m in self.model[-3:]  # is final layer, copy input as inplace fix
-        o = thop.profile(m, inputs=[x.clone() if c else x], verbose=False)[0] / 1E9 * 2 if thop else 0  # FLOPs
-        t = time_sync()
-        for _ in range(10):
-            m(x.clone() if c else x)
-        dt.append((time_sync() - t) * 100)
-        if m == self.model[0]:
-            LOGGER.info(f"{'time (ms)':>10s} {'GFLOPs':>10s} {'params':>10s}  module")
-        LOGGER.info(f'{dt[-1]:10.2f} {o:10.2f} {m.np:10.0f}  {m.type}')
-        if c:
-            LOGGER.info(f"{sum(dt):10.2f} {'-':>10s} {'-':>10s}  Total")
-                  
     def fuse(self, verbose=True):
         """
         Fuse the `Conv2d()` and `BatchNorm2d()` layers of the model into a single layer, in order to improve the
@@ -181,25 +148,6 @@ class MultiBaseModel(nn.Module):
             imgsz (int): the size of the image that the model will be trained on. Defaults to 640
         """
         return model_info(self, detailed=detailed, verbose=verbose, imgsz=imgsz)
-
-#     def _apply(self, fn):
-#         """
-#         `_apply()` is a function that applies a function to all the tensors in the model that are not
-#         parameters or registered buffers
-
-#         Args:
-#             fn: the function to apply to the model
-
-#         Returns:
-#             A model that is a Detect() object.
-#         """
-#         self = super()._apply(fn)
-#         m = self.model[-1]  # Detect()
-#         if isinstance(m, (Detect, Segment)):
-#             m.stride = fn(m.stride)
-#             m.anchors = fn(m.anchors)
-#             m.strides = fn(m.strides)
-#         return self
     
     def _apply(self, fn):
         """
@@ -236,53 +184,92 @@ class MultiBaseModel(nn.Module):
             LOGGER.info(f'Transferred {len(csd)}/{len(self.model.state_dict())} items from pretrained weights')
     
 class MultiModel(MultiBaseModel):
-    """YOLOv8 detection and segmentation model."""
+    """YOLOv8 detection and classification model."""
 
-    def __init__(self, cfg='yolov8_multi.yaml', ch=2, nc=None, verbose=True):
+    def __init__(self, cfg='yolov8_multi.yaml', ch=3, nc=None, nc_1=None, verbose=True):
         super().__init__()
         self.yaml = cfg if isinstance(cfg, dict) else yaml_model_load(cfg)
         ch = self.yaml['ch'] = self.yaml.get('ch', ch)
-        if nc and nc != self.yaml['tnc']:
-            LOGGER.info(f"Overriding model.yaml nc={self.yaml['tnc']} with nc={nc}")
+        if nc and nc != self.yaml['nc']:
+            LOGGER.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
             self.yaml['tnc'] = nc
-        self.model, self.save = parse_model(deepcopy(self.yaml), ch=ch, verbose=verbose)
-        # self.names = {i: f'{i}' for i in range(self.yaml['tnc'])}
-        self.names = {i: f"{i}" for i in range(self.yaml["nc"])} 
+        if nc_1 and nc_1 != self.yaml['nc_1']:
+            LOGGER.info(f"Overriding model.yaml nc_1={self.yaml['nc_1']} with nc_1={nc_1}")
+            self.yaml['nc_1'] = nc_1
+            
+        self.model, self.head_2, self.save = parse_model(deepcopy(self.yaml), ch=ch, verbose=verbose)
+        self.name_1 = {i: f"{i}" for i in range(self.yaml["nc"])} 
+        self.name_2 = {i: f"{i}" for i in range(self.yaml["nc_1"])}
         self.inplace = self.yaml.get('inplace', True)
         self.stride = []
 
         # Build strides
         # in here they are processing model and convert head into format tensor
         count = 0
-        for m in self.model:
+        for m in (self.model + self.head_2):
+            print(f"Currently processing layer {count}")
+            print("Value of m:", m)
+            
             if isinstance(m, (Detect, Classify)):
                 s = 256
                 m.inplace = self.inplace
                 
                 if isinstance(m, Detect):
+                    print("shape layer det:", m.shape)  
+                    outputs = self.forward(torch.zeros(1, ch, s, s))
+                    print("Number of outputs:", len(outputs))
+                    print("Outputs:", outputs.shape)  
+                    print("type", type(outputs))    
+                    exit()
                     forward = lambda x: self.forward(x)[count]
                     m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward for Detect
+                    print("Stride of detect:", m.stride)
                 elif isinstance(m, Classify):
-                    forward = lambda x: self.forward(x)[count]  # Adjust this according to how the Classify head processes
-                    m   .stride = torch.Tensor([1])  # forward for Classify
-                else:
-                    forward = lambda x: self.forward(x)[count][0] if isinstance(m, (Segment, Pose)) else self.forward(x)[count]
-                    m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # default forward
-                # if isinstance(m, Detect):
-                #     output_detect = self.forward(x)["detection"]
-                # else: 
-                #     output_class = self.forward(x)["detection"]
-                # print("////*/***", x)
-                # output = forward(torch.zeros(1, ch, s, s))
-                # print("Output tensor shape:", type(output[0]))
-                # print("Output tensor:", output[0].shape)
+                    # forward = lambda x: self.forward(x)[count]  # Adjust this according to how the Classify head processes
+                    m.stride = torch.Tensor([1])  # forward for Classify
+                    print("Stride of classify:", m.stride)
+
                 self.stride.append(m.stride)
                 try:
                     m.bias_init()
                 except:
                     pass
-                count = count + 1
 
+            count += 1  # Increment count after each iteration
+            # print(f"Next count value will be {count}\n")
+            
+        # for m in self.head_2:
+        #     print ("value of m in head_2", m)
+        #     if isinstance(m, Classify):
+        #         forward = lambda x: self.forward(x)[count]  # Adjust this according to how the Classify head processes
+        #         m.stride = torch.Tensor([1])  # forward for Classify
+        #         print("stride of classify",m.stride)   
+                
+        # for m in self.model:
+        #     print("value of m", m)
+        #     if isinstance(m, (Detect, Classify)):
+        #         s = 256
+        #         m.inplace = self.inplace
+                
+        #         if isinstance(m, Detect):                    
+        #             forward = lambda x: self.forward(x)[count]
+        #             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward for Detect
+        #             print("stride of detec",m.stride)
+                    
+                # elif isinstance(m, Classify):
+                #     forward = lambda x: self.forward(x)[count]  # Adjust this according to how the Classify head processes
+                #     m.stride = torch.Tensor([1])  # forward for Classify
+                #     print("stride of classifi",m.stride)
+
+                # else:
+                #     forward = lambda x: self.forward(x)[count][0] if isinstance(m, (Segment, Pose)) else self.forward(x)[count]
+                #     m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # default forward
+                # self.stride.append(m.stride)
+                # try:
+                #     m.bias_init()
+                # except:
+                #     pass
+                # count = count + 1
         initialize_weights(self)
         if verbose:
             self.info()
@@ -293,7 +280,14 @@ class MultiModel(MultiBaseModel):
         """Run forward pass on input image(s) with optional augmentation and profiling."""
         if augment:
             return self._forward_augment(x)
-        return self._forward_once(x, profile=profile, visualize=visualize)
+        # return self._forward_once(x, profile=profile, visualize=visualize)
+        output = self._forward_once(x, profile=profile, visualize=visualize)
+
+    # Print the output before returning
+        # print("Forward output:", output)
+        # print("Forward output type:", type(output))
+        
+        return output
     
     def _forward_augment(self, x):
         """Perform augmentations on input image x and return augmented inference and train outputs."""
@@ -332,12 +326,12 @@ class MultiModel(MultiBaseModel):
             y[i] = y[i][..., :-indices] if i == 0 else y[i][..., indices:]  # clip tails
         return y
     
-    def combine_results(self, detec_results, class_results):
+    # def combine_results(self, detec_results, class_results):
 
-        return {
-            "detection": detec_results,
-            "classification": class_results
-        }
+    #     return {
+    #         "detection": detec_results,
+    #         "classification": class_results
+    #     }
 
 # Functions ------------------------------------------------------------------------------------------------------------
 
@@ -486,7 +480,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
     if verbose:
         LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<45}{'arguments':<30}")
     ch = [ch] #khai ch co o day 
-    layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out 
+    layers,layers_2, save, c2 =[], [], [], ch[-1]  # layers, savelist, ch out 
 
 #backbone + head_1---------------------------------------------------------------------------------------------------------------------------
     for i, (f, n, m, args) in enumerate(d['backbone']+d['head_1']):  # from, number, module, args
@@ -529,9 +523,9 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             ch_list = [ch[x] for x in f]
         elif m in (Detect, Segment, Pose, RTDETRDecoder):
             args.append([ch[x] for x in f])
-            print("value of f ", f)
-            for x in f:
-                print("value of ch[]", ch[x])
+            # print("value of f ", f)
+            # for x in f:
+                # print("value of ch[]", ch[x])
             if m is Segment:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
         else:
@@ -600,14 +594,14 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         if verbose:
             LOGGER.info(f'{i:>3}{str(f):>20}{n_:>3}{m.np:10.0f}  {t:<45}{str(args):<30}')  # print
         save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist
-        layers.append(m_)
+        layers_2.append(m_)
         if i == 0:
             ch = []
         ch.append(c2)
     #the end cycle for 
 
 
-    return nn.Sequential(*layers), sorted(save)
+    return nn.Sequential(*layers), nn.Sequential(*layers_2), sorted(save)
 
 
 def yaml_model_load(path):

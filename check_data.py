@@ -1,23 +1,23 @@
 from pathlib import Path
-from ultralytics.data.multi_data import YOLODataset
+from ultralytics.yolo.data.dataset import YOLODataset
 # from ultralytics.data.dataset import YOLODataset
 from torch.utils.data import DataLoader
 import torch
-import yaml 
+import yaml
 from copy import deepcopy
+
 
 class Check_dataload(YOLODataset):
     def __init__(self, img_path, data=None, task_type="multi"):
         self.data = data
-        # self.label_update_count = 0 
+        # self.label_update_count = 0
 
-        super().__init__(img_path,data=data, task_type=task_type)
-    
+        super().__init__(img_path, data=data, task_type=task_type)
+
     # def __getitem__(self, index):
     #     label = self.get_image_and_label(index)
     #     # print("Fetching item at index:", index)
     #     return self.transforms(label)
-
 
     # def get_label_info(self, index):
     #         # print("Current index:", index)
@@ -26,8 +26,8 @@ class Check_dataload(YOLODataset):
     #         if index >= len(self.labels[0]):
     #             raise IndexError(f"Index {index} is out of range for self.labels[0].")
     #         print("Original label:", self.labels[index])
-    #         label = deepcopy(self.labels[index])  # out range 
-            
+    #         label = deepcopy(self.labels[index])  # out range
+
     #         label.pop('shape', None)
     #         label['img'], label['ori_shape'], label['resized_shape'] = self.load_image(index)
     #         label['ratio_pad'] = (label['resized_shape'][0] / label['ori_shape'][0],
@@ -36,23 +36,24 @@ class Check_dataload(YOLODataset):
     #             label['rect_shape'] = self.batch_shapes[self.batch[index]]
     #         label = self.update_labels_info(label)
     #         return label
-        
+
     # def __getitem__(self, idx):
     #     return torch.rand(640, 640, 3), 0
-    
+
 # dataset = Check_dataload(img_path="/home/ubuntu/khai202/test_input/train/images")
 
 # dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 # for images, labels in dataloader:
-#     print(images.shape)  
+#     print(images.shape)
 #     print(labels)  # Nhãn
 #     break  # Chỉ in ra một batch
+
 
 with open('/home/ubuntu/khai202/test_input/data.yaml', 'r') as f:
     data = yaml.safe_load(f)
 img_path = "/home/ubuntu/khai202/test_input/train/images"
-dataset = Check_dataload(img_path, data=data, task_type = "multi" )
+dataset = Check_dataload(img_path, data=data, task_type="multi")
 
 # from pathlib import Path
 # from ultralytics.data.dataset import YOLODataset
@@ -77,11 +78,15 @@ dataset = Check_dataload(img_path, data=data, task_type = "multi" )
 
 # from torch.utils.data import DataLoader
 
-dataloader = DataLoader(dataset, batch_size=1, collate_fn=YOLODataset.collate_fn, shuffle=False)
+dataloader = DataLoader(
+    dataset,
+    batch_size=1,
+    collate_fn=YOLODataset.collate_fn,
+    shuffle=False)
 # print(len(dataloader))
 # exit()
 for batch in dataloader:
     # print("Processing batch")
     # print(len(batch))
     # exit()
-    break  
+    break

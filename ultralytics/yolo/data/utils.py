@@ -44,12 +44,13 @@ FORMATS_HELP_MSG = f"Supported formats are:\nimages: {IMG_FORMATS}\nvideos: {VID
 def img2label_paths(img_paths):
     """Define label paths as a function of image paths."""
     sa, sb = f"{os.sep}images{os.sep}", f"{os.sep}labels{os.sep}"  # /images/, /labels/ substrings
+    
     return [sb.join(x.rsplit(sa, 1)).rsplit(".", 1)[0] + ".txt" for x in img_paths]
 
 #khai
 def label2img_paths(img_paths):
     sb, sa = f"{os.sep}labels{os.sep}", f"{os.sep}images{os.sep}"
-    return [sa.join(x.rsplit(sb, 1)). rsplit(".", 1)[0]+"jpg" for x in img_paths]
+    return [sa.join(x.rsplit(sb, 1)). rsplit(".", 1)[0]+".jpg" for x in img_paths]
 
 def get_hash(paths):
     """Returns a single hash value of a list of paths (files or dirs)."""
@@ -95,78 +96,6 @@ def verify_image(args):
         nc = 1
         msg = f"{prefix}WARNING ⚠️ {im_file}: ignoring corrupt image/label: {e}"
     return (im_file, cls), nf, nc, msg
-
-# code gốc 
-# def verify_image_label(args):
-#     """Verify one image-label pair."""
-#     im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim = args
-#     # Number (missing, found, empty, corrupt), message, segments, keypoints
-#     nm, nf, ne, nc, msg, segments, keypoints = 0, 0, 0, 0, "", [], None
-#     try:
-#         # Verify images
-#         im = Image.open(im_file)
-#         im.verify()  # PIL verify
-#         shape = exif_size(im)  # image size
-#         shape = (shape[1], shape[0])  # hw
-#         assert (shape[0] > 9) & (shape[1] > 9), f"image size {shape} <10 pixels"
-#         assert im.format.lower() in IMG_FORMATS, f"invalid image format {im.format}"
-#         if im.format.lower() in ("jpg", "jpeg"):
-#             with open(im_file, "rb") as f:
-#                 f.seek(-2, 2)
-#                 if f.read() != b"\xff\xd9":  # corrupt JPEG
-#                     ImageOps.exif_transpose(Image.open(im_file)).save(im_file, "JPEG", subsampling=0, quality=100)
-#                     msg = f"{prefix}WARNING ⚠️ {im_file}: corrupt JPEG restored and saved"
-
-#         # Verify labels
-#         if os.path.isfile(lb_file): # kiển tra sự tồn tại của tệp nhãn 
-#             nf = 1  # label found
-#             with open(lb_file) as f: 
-#                 lb = [x.split() for x in f.read().strip().splitlines() if len(x)]
-#                 if any(len(x) > 6 for x in lb) and (not keypoint):  # is segment
-#                     classes = np.array([x[0] for x in lb], dtype=np.float32)
-#                     segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb]  # (cls, xy1...)
-#                     lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
-#                 lb = np.array(lb, dtype=np.float32)
-#             nl = len(lb)
-#             if nl:
-#                 if keypoint:# đảm bảo hình dạng và nhãn đúng và trích xuất điểm 
-#                     assert lb.shape[1] == (5 + nkpt * ndim), f"labels require {(5 + nkpt * ndim)} columns each"
-#                     points = lb[:, 5:].reshape(-1, ndim)[:, :2]
-#                 else:
-#                     assert lb.shape[1] == 5, f"labels require 5 columns, {lb.shape[1]} columns detected"
-#                     points = lb[:, 1:]
-#                 assert points.max() <= 1, f"non-normalized or out of bounds coordinates {points[points > 1]}"
-#                 assert lb.min() >= 0, f"negative label values {lb[lb < 0]}"
-
-#                 # All labels
-#                 max_cls = lb[:, 0].max()  # max label count
-#                 assert max_cls <= num_cls, (
-#                     f"Label class {int(max_cls)} exceeds dataset class count {num_cls}. "
-#                     f"Possible class labels are 0-{num_cls - 1}"
-#                 )
-#                 _, i = np.unique(lb, axis=0, return_index=True)
-#                 if len(i) < nl:  # duplicate row check
-#                     lb = lb[i]  # remove duplicates
-#                     if segments:
-#                         segments = [segments[x] for x in i]
-#                     msg = f"{prefix}WARNING ⚠️ {im_file}: {nl - len(i)} duplicate labels removed"
-#             else:
-#                 ne = 1  # label empty
-#                 lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
-#         else:
-#             nm = 1  # label missing
-#             lb = np.zeros((0, (5 + nkpt * ndim) if keypoints else 5), dtype=np.float32)
-#         if keypoint:
-#             keypoints = lb[:, 5:].reshape(-1, nkpt, ndim)
-#             if ndim == 2:
-#                 kpt_mask = np.where((keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0).astype(np.float32)
-#                 keypoints = np.concatenate([keypoints, kpt_mask[..., None]], axis=-1)  # (nl, nkpt, 3)
-#         lb = lb[:, :5]
-#         return im_file, lb, shape, segments, keypoints, nm, nf, ne, nc, msg
-#     except Exception as e:
-#         nc = 1
-#         msg = f"{prefix}WARNING ⚠️ {im_file}: ignoring corrupt image/label: {e}"
-#         return [None, None, None, None, None, nm, nf, ne, nc, msg]3
 
 #khai custom format label [cls_color][cls_obj]xywh
 def verify_image_label(args):
@@ -243,7 +172,7 @@ def verify_image_label(args):
 #khai custom
 def verify_image_mlt_label(args):
     """Verify one image-mul_label pair."""
-    im_file, lb_file, images_files, prefix, num_cls, nkpt, ndim = args
+    im_file, lb_file, prefix, num_cls_1, num_cls_2, nkpt, ndim = args
     # Number (missing, found, empty, corrupt)
     nm, nf, ne, nc, msg = 0, 0, 0, 0, ""
     try:
@@ -275,11 +204,16 @@ def verify_image_mlt_label(args):
                 assert lb.min() >= 0, f"negative label values {lb[lb < 0]}"
 
                 # All labels
-                max_cls = lb[:, :2].max()  # max label count
-                assert max_cls <= num_cls, (
-                    f"Label class {int(max_cls)} exceeds dataset class count {num_cls}. "
-                    f"Possible class labels are 0-{num_cls - 1}"
-                )
+                # max_cls_1 = lb[:, :1].max()  # max label count
+                # assert max_cls_1 <= num_cls_1, (
+                #     f"Label class {int(max_cls_1)} exceeds dataset class count {num_cls_1}. "
+                #     f"Possible class labels are 0-{num_cls - 1}"
+                # )
+                # max_cls_2 = lb[:, :2].max()  # max label count
+                # assert max_cls_2 <= num_cls_2, (
+                #     f"Label class {int(max_cls_2)} exceeds dataset class count {num_cls_2}. "
+                #     f"Possible class labels are 0-{num_cls - 1}"
+                # )
                 _, i = np.unique(lb, axis=0, return_index=True)
                 if len(i) < nl:  # duplicate row check
                     lb = lb[i]  # remove duplicates
@@ -295,7 +229,7 @@ def verify_image_mlt_label(args):
     except Exception as e:
         nc = 1
         msg = f"{prefix}WARNING ⚠️ {im_file}: ignoring corrupt image/label: {e}"
-        return [None, None, None, nm, nf, ne, nc, msg]
+        return [None, None, None, None , None, nm, nf, ne, nc, msg]
 
 
 
@@ -383,103 +317,26 @@ def find_dataset_yaml(path: Path) -> Path:
     assert len(files) == 1, f"Expected 1 YAML file in '{path.resolve()}', but found {len(files)}.\n{files}"
     return files[0]
 
-def check_det_dataset(dataset, autodownload=True):
-    
-        # Download, verify, and/or unzip a dataset if not found locally.
-
-        # Chức năng này kiểm tra tính khả dụng của một bộ dữ liệu được chỉ định và nếu không tìm thấy, nó có tùy chọn tải xuống và
-        # Giải nén bộ dữ liệu.Sau đó, nó đọc và phân tích dữ liệu YAML đi kèm, đảm bảo các yêu cầu chính được đáp ứng và cả
-        # Giải quyết các đường dẫn liên quan đến bộ dữ liệu.
-
-        # Args:
-        #     dataset (str): Path to the dataset or dataset descriptor (like a YAML file).
-        #     autodownload (bool, optional): Whether to automatically download the dataset if not found. Defaults to True.
-
-        # Returns:
-        #     (dict): Parsed dataset information and paths.
-    
-
-    file = check_file(dataset)
-
-    # Download (optional)
-    extract_dir = ""
-    if zipfile.is_zipfile(file) or is_tarfile(file):
-        new_dir = safe_download(file, dir=DATASETS_DIR, unzip=True, delete=False)
-        file = find_dataset_yaml(DATASETS_DIR / new_dir)
-        extract_dir, autodownload = file.parent, False
-
-    # Read YAML
-    data = yaml_load(file, append_filename=True)  # dictionary
-
-    # Checks
-    for k in "train", "val":
-        if k not in data:
-            if k != "val" or "validation" not in data:
-                raise SyntaxError(
-                    emojis(f"{dataset} '{k}:' key missing ❌.\n'train' and 'val' are required in all data YAMLs.")
-                )
-            LOGGER.info("WARNING ⚠️ renaming data YAML 'validation' key to 'val' to match YOLO format.")
-            data["val"] = data.pop("validation")  # replace 'validation' key with 'val' key
-    if "names" not in data and "nc" not in data:
-        raise SyntaxError(emojis(f"{dataset} key missing ❌.\n either 'names' or 'nc' are required in all data YAMLs."))
-    if "names" in data and "nc" in data and len(data["names"]) != data["nc"]:
-        raise SyntaxError(emojis(f"{dataset} 'names' length {len(data['names'])} and 'nc: {data['nc']}' must match."))
-    if "names" not in data:
-        data["names"] = [f"class_{i}" for i in range(data["nc"])]
-    else:
-        data["nc"] = len(data["names"])
-
-    data["names"] = check_class_names(data["names"])
-
-    # Resolve paths
-    path = Path(extract_dir or data.get("path") or Path(data.get("yaml_file", "")).parent)  # dataset root
-    if not path.is_absolute():
-        path = (DATASETS_DIR / path).resolve()
-
-    # Set paths
-    data["path"] = path  # download scripts
-    for k in "train", "val", "test":
-        if data.get(k):  # prepend path
-            if isinstance(data[k], str):
-                x = (path / data[k]).resolve()
-                if not x.exists() and data[k].startswith("../"):
-                    x = (path / data[k][3:]).resolve()
-                data[k] = str(x)
-            else:
-                data[k] = [str((path / x).resolve()) for x in data[k]]
-
-    # Parse YAML
-    val, s = (data.get(x) for x in ("val", "download"))
-    if val:
-        val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
-        if not all(x.exists() for x in val):
-            name = clean_url(dataset)  # dataset name with URL auth stripped
-            m = f"\nDataset '{name}' images not found ⚠️, missing path '{[x for x in val if not x.exists()][0]}'"
-            if s and autodownload:
-                LOGGER.warning(m)
-            else:
-                m += f"\nNote dataset download directory is '{DATASETS_DIR}'. You can update this in '{SETTINGS_YAML}'"
-                raise FileNotFoundError(m)
-            t = time.time()
-            r = None  # success
-            if s.startswith("http") and s.endswith(".zip"):  # URL
-                safe_download(url=s, dir=DATASETS_DIR, delete=True)
-            elif s.startswith("bash "):  # bash script
-                LOGGER.info(f"Running {s} ...")
-                r = os.system(s)
-            else:  # python script
-                exec(s, {"yaml": data})
-            dt = f"({round(time.time() - t, 1)}s)"
-            s = f"success ✅ {dt}, saved to {colorstr('bold', DATASETS_DIR)}" if r in (0, None) else f"failure {dt} ❌"
-            LOGGER.info(f"Dataset download {s}\n")
-    check_font("Arial.ttf" if is_ascii(data["names"]) else "Arial.Unicode.ttf")  # download fonts
-
-    return data  # dictionary
-
 #khai 
 def check_multi_dataset(dataset):
-    data = yaml_load(file, append_filename = True)
+    
+    data = check_file(dataset)
+    
+    extract_dir = ''
+    if isinstance(data, (str, Path)) and (zipfile.is_zipfile(data) or is_tarfile(data)):
+        new_dir = safe_download(data, dir=DATASETS_DIR, unzip=True, delete=False, curl=False)
+        data = next((DATASETS_DIR / new_dir).rglob('*.yaml'))
+        extract_dir, autodownload = data.parent, False
+        
+    if isinstance(data, (str, Path)):
+        data = yaml_load(data, append_filename=True)  # dictionary
+           
     for k in "train","val":
+        print("---*-*-*-", k)
+        if k in data:
+            print(f"Key '{k}' exists in data with value: {data[k]}")
+            
+        
         if k not in data:
             if k != "val" or "validation" not in data:
                 raise SyntaxError(
@@ -491,16 +348,21 @@ def check_multi_dataset(dataset):
     if "name_1" not in data and "name_2" not in data:
             raise SyntaxError(f"{dataset} key missing ❌.\nEither 'name_1' (for classification) or 'name_2' (for detection) is required in all data YAMLs.")
     
-    if "name_1" in data and "name_2" in data and len(data["name_1"]) != len(data["name_2"]):
+    if "name_1" in data and "nc" in data and len(data["name_1"]) != len(data["nc"]):
         raise SyntaxError(f"{dataset} 'name_1' length {len(data['name_1'])} and 'name_2: {len(data['name_2'])}' must match.")
     
-    data["nc_1"] = len(data.get("name_1", []))
-    data["nc_2"] = len(data.get("name_2", []))
+    if "name_2" in data and "nc_1" in data and len(data["name_2"]) != len(data["nc_1"]):
+            raise SyntaxError(f"{dataset} 'name_1' length {len(data['name_1'])} and 'name_2: {len(data['name_2'])}' must match.")
+    
+    data["nc"] = len(data.get("name_1", []))
+    data["nc_1"] = len(data.get("name_2", []))
+    # print("value_data:", data["nc"], data["nc_1"])
 
     # Kiểm tra và xử lý tên các lớp
     data["name_1"] = check_class_names(data.get("name_1", []))
     data["name_2"] = check_class_names(data.get("name_2", []))    
-    
+    # print("value_data:", data["name_1"] \ data["name_2"])
+
     path = Path(extract_dir or data.get("path") or Path(data.get("yaml_file", "")).parent)  # dataset root
     if not path.is_absolute():
         path = (DATASETS_DIR / path).resolve()
@@ -785,7 +647,7 @@ def compress_one_image(f, f_new=None, max_dim=1920, quality=50):
     """
     Compresses a single image file to reduced size while preserving its aspect ratio and quality using either the Python
     Imaging Library (PIL) or OpenCV library. If the input image is smaller than the maximum dimension, it will not be
-    resized.
+    resized.BaseValidator
 
     Args:
         f (str): The path to the input image file.

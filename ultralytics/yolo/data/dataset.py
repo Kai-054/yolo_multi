@@ -5,11 +5,13 @@ import torchvision
 from PIL import Image
 from pathlib import Path
 from ultralytics.yolo.utils.instance import Instances
+from multiprocessing.pool import ThreadPool
+from itertools import repeat
 import traceback
 from ultralytics.yolo.utils import LOCAL_RANK, NUM_THREADS, TQDM, colorstr, is_dir_writeable
-from .augment import Compose, Format, Instances, LetterBox, classify_transforms, v8_transforms_multi
+from .augment import Compose, Format, Instances, LetterBox, classify_transforms, v8_transforms
 from .base import BaseDataset
-from .utils import HELP_URL, LOGGER, get_hash, img2label_paths, verify_image, verify_image_label, label2img_paths, verify_image_mlt_label
+from .utils import HELP_URL, LOGGER, get_hash, img2label_paths,label2img_paths, verify_image_mlt_label
 # Ultralytics dataset *.cache version, >= 1.0.0 for YOLOv8
 DATASET_CACHE_VERSION = "1.0.3"
 
@@ -33,14 +35,17 @@ class YOLODataset(BaseDataset):
                 iterable=zip(
                     self.im_files,
                     self.label_files,
-                    self.images_files,
                     repeat(self.prefix),
-                    repeat(len(self.data["names"])),
+                    repeat(len(self.data["name_1"])), #name logo
+                    repeat(len(self.data["name_2"])), #name types car
                     repeat(nkpt),
                     repeat(ndim),
                 ),
             )
+
             pbar = TQDM(results, desc=desc, total=total)
+            # for result in pbar:
+            #     print(result)
             for im_file, lb, shape, nm_f, nf_f, ne_f, nc_f, msg in pbar:
                 nm += nm_f
                 nf += nf_f
@@ -77,7 +82,7 @@ class YOLODataset(BaseDataset):
     def get_labels(self):
         """Trả về từ điển nhãn cho đào tạo Yolo."""
         self.label_files = img2label_paths(self.im_files)
-        self.images_files = label2img_paths(self.im_files)  # custom
+        # self.images_files = label2img_paths(self.im_files)  # custom
         
         cache_path = Path(self.label_files[0]).parent.with_suffix(".cache")
         try:
@@ -124,7 +129,7 @@ class YOLODataset(BaseDataset):
         if self.augment:
             hyp.mosaic = hyp.mosaic if self.augment and not self.rect else 0.0
             hyp.mixup = hyp.mixup if self.augment and not self.rect else 0.0
-            transforms = v8_transforms_multi(self, self.imgsz, hyp)
+            transforms = v8_transforms(self, self.imgsz, hyp)
         else:
             transforms = Compose([LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)])
         
@@ -159,55 +164,74 @@ class YOLODataset(BaseDataset):
         # traceback.print_stack()
 
         bboxes = label.pop("bboxes")
-        print("khai2", bboxes)
+        # print("khai2", bboxes)
         bbox_format = label.pop("bbox_format")
         normalized = label.pop("normalized")
 
         # NOTE: do NOT resample oriented boxes
         label["instances"] = Instances(bboxes, bbox_format=bbox_format, normalized=normalized)
-        print("khai3", label["instances"])
+        # print("khai3", label["instances"])
         # print(f"Số lần update_labels_info được gọi: {self.label_update_count}")  
         return label
 
     @staticmethod
     def collate_fn(batch):
         """Collates data samples into batches."""
-        print("Batch:", batch)  # In ra toàn bộ batch
-        print("Type of batch[0]:", type(batch[0]))
+        # print("Batch:", batch)  # In ra toàn bộ batch
+        # print("Type of batch[0]:", type(batch[0]))
         new_batch = {}
+        new_batch_list = []
         keys = batch[0].keys()
         values = list(zip(*[list(b.values()) for b in batch]))
         for i, k in enumerate(keys):
             value = values[i]
+            # print("values", values)
+            # print('i=',i)
+            # print('k=',k)
+            
             if k == "img":
                 value = torch.stack(value, 0)
-            if k in [ "bboxes", "cls_obj", "cls_color"]:
-                value = torch.cat(value, 0)
+                # print ("value of img", value)
+                try:
+                    value = torch.stack(value, 0)
+                    # print ("value of img", value)
+                except Exception as e:
+                    print(f"Error stacking 'img' tensors: {[v.shape for v in value]}")
+                    print(e)
+            elif k in ["bboxes", "cls_color", "cls_obj"]:
+                try:
+                    # print(f"Concatenating '{k}' tensors: {[v.shape for v in value]}")
+                    value = torch.cat(value, 0)
+                    # print ("value of k(bboxes", "cls_color", "cls_obj)", value)
+
+                except Exception as e:
+                    print(f"Error concatenating '{k}' tensors: {[v.shape for v in value]}")
+                    print(e)
+                    
             new_batch[k] = value
-        print("Batch before update:", new_batch)
-        if "batch_idx" in new_batch:
-            print("Batch indices before update:", new_batch["batch_idx"])
-        else:
-            print("No batch_idx in the batch")
-        new_batch["batch_idx"] = list(new_batch["batch_idx"])
-        new_batch["batch_idx"] = list(new_batch.get("batch_idx", []))
-        for i in range(len(new_batch["batch_idx"])):
-            new_batch["batch_idx"][i] += i  # add target image index for build_targets()
-        new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
-        # print("Batch indices after update:", new_batch["batch_idx"]) 
-        """
-        print(f"Keys: {keys}")
-        print(f"Batch size: {len(batch)}")
-        for key in new_batch:
-            # print("cls_obj:", new_batch["cls_obj"])
-            print(f"khai:{key}: {new_batch[key].shape if isinstance(new_batch[key], torch.Tensor) else new_batch[key]}")
-        # cls_obj_list = new_batch["cls_obj"].tolist()
-        # print("cls_obj:", cls_obj_list)
-        new_batch["batch_idx"] = list(new_batch["batch_idx"])
-        for i in range(len(new_batch["batch_idx"])):
-            new_batch["batch_idx"][i] += i  # add target image index for build_targets()
+            
+        # print("Batch before update:", new_batch)
+            # if "batch_idx" not in new_batch:
+            #     print("No batch_idx in the batch, adding batch_idx.")
+            #     new_batch["batch_idx"] = torch.arange(len(batch)).unsqueeze(1)
+                
+            # print("Batch after adding batch_idx:", new_batch)  
+                 
+        #     if "batch_idx" in new_batch:
+        #         print("Batch indices before update:", new_batch["batch_idx"])
+        #         new_batch["batch_idx"] = list(new_batch["batch_idx"])
+        #         for i in range(len(new_batch["batch_idx"])):
+        #             new_batch["batch_idx"][i] += i  # add target image index for build_targets()
+        #         new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
+        #     else:
+        #         print("No batch_idx in the batch")
+            
+        # new_batch["batch_idx"] = list(new_batch["batch_idx"])
+        # new_batch["batch_idx"] = list(new_batch.get("batch_idx", []))
+        # for i in range(len(new_batch["batch_idx"])):
+        #     new_batch["batch_idx"][i] += i  # add target image index for build_targets()
         # new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
-        """
+        # print("Batch indices after update:", new_batch["batch_idx"]) 
         return new_batch
     
 def save_dataset_cache_file(prefix, path, x):

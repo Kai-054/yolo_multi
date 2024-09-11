@@ -45,6 +45,14 @@ class FocalLossV1(nn.Module):
         return loss
 
 
+class v8ClassificationLoss:
+    """Criterion class for computing training losses."""
+
+    def __call__(self, preds, batch):
+        """Compute the classification loss between predictions and true labels."""
+        loss = F.cross_entropy(preds, batch["cls"], reduction="mean")
+        loss_items = loss.detach()
+        return loss, loss_items
 
 class tversky(nn.Module):
     def __init__(self, smooth=1):
@@ -66,6 +74,7 @@ class tversky(nn.Module):
         loss = (true_pos + self.smooth)/(true_pos + alpha*false_neg + (1-alpha)*false_pos + self.smooth)
 
         return 1-loss
+    
 class DiceLoss(nn.Module):
     def __init__(self, smooth=1, reduction='mean', weight=None, ignore_lb=255):
         super(DiceLoss, self).__init__()

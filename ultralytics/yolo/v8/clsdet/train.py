@@ -72,32 +72,67 @@ class MultitaskTrainer(BaseTrainer):
 
 
     def set_model_attributes(self):
-    
+        self.model.nc = self.data['nc']  # attach number of classes to model
+        self.model.nc_1 = self.data['nc_1']
+        self.model.names_2 = self.data['name_2']
+        self.model.names_1 = self.data['names_1']  # attach class names to model
+        self.model.args = self.args  # attach hyperparameters to model
+            
     def get_model(self, cfg=None, weights=None, verbose=True):
+        multi_model = MultiModel(cfg, nc=self.data['nc'], nc_1=self.data['nc_1'], verbose=verbose and RANK == -1)
+        if weights:
+            multi_model.load(weights)
+        return multi_model
         
     def get_validator(self): #return detval and clsval 
         self.loss_names = {"det":['box_loss', 'cls_loss', 'dfl_loss'], "cls":["loss"]}
                 return yolo.clsdet.DetclsValidator(   #rewirte val.py
             self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )
-        
+
+    def criterion(self, preds, batch, name=None, count=None):
+        """Compute loss for YOLO prediction and ground-truth."""
+        # if 'det' in name:
+        #     self.compute_loss = Loss(de_parallel(self.model),count-len(self.data['labels_list']))
+        # elif 'seg' in name:
+        #     self.compute_loss = SegLoss(de_parallel(self.model), overlap=self.args.overlap_mask, count=count-len(self.data['labels_list']), task_name = name, map=self.data['map'][count])
+        return self.compute_loss(preds, batch)
+
     def label_loss_items(self, loss_items=None, prefix="train"):
+        keys = [f"{prefix}/{x}" for x in self.loss_names]
+        if loss_items is not None:
+            loss_items = [round(float(x), 5) for x in loss_items]  # convert tensors to 5 decimal place floats
+            return dict(zip(keys, loss_items))
+        else:
+            return keys
         
     def progress_string(self):
+        return ("\n" + "%11s" * (4 + len(self.loss_names))) % (
+            "Epoch",
+            "GPU_mem",
+            *self.loss_names,
+            "Instances",
+            "Size",
+        )       
         
     def plot_training_samples(self, batch, ni):
-        fname = self.save_dir / f"train_batch{self.data['labels_list'][task]}{ni}.jpg" if task!=None else self.save_dir / f'train_batch{ni}.jpg'
-                if 'det' in self.data['labels_list'][task]:
-                    plot_images(images=batch['img'],
-                        batch_idx=batch['batch_idx'],
-                        cls=batch['cls'].squeeze(-1),
-                        bboxes=batch['bboxes'],
-                        paths=batch['im_file'],
-                        fname=fname,
-                        on_plot=self.on_plot)
-                elif 'cls' :
+        plot_images(
+            images=batch["img"],
+            batch_idx=batch["batch_idx"],
+            cls_color=batch["cls_color"].view(-1),
+            cls_obj=batch["cls_obj"].squeeze(-1),
+            bboxes=batch["bboxes"],
+            paths=batch["im_file"],
+            fname=self.save_dir / f"train_batch{ni}.jpg",
+            on_plot=self.on_plot,
+        )
 
-        
     def plot_metrics(self):
         
+        plot_results(file=self.csv, on_plot=self.on_plot)
+        
     def plot_training_labels(self):
+        
+        boxes = np.concatenate([lb["bboxes"] for lb in self.train_loader.dataset.labels], 0)
+        cls = np.concatenate([lb["cls"] for lb in self.train_loader.dataset.labels], 0)
+        plot_labels(boxes, cls.squeeze(), names=self.data["names"], save_dir=self.save_dir, on_plot=self.on_plot)

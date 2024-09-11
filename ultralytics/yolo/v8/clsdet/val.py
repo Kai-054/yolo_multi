@@ -11,7 +11,7 @@ from ultralytics.yolo.data import build_dataloader, build_yolo_dataset
 from ultralytics.yolo.engine.validator import BaseValidator
 from ultralytics.yolo.utils import DEFAULT_CFG, LOGGER, colorstr, ops, NUM_THREADS
 from ultralytics.yolo.utils.checks import check_requirements
-from ultralytics.yolo.utils.metrics import ConfusionMatrix, DetMetrics, box_iou, SegmentMetrics, mask_iou
+from ultralytics.yolo.utils.metrics import ConfusionMatrix,ClassifyMetrics, DetMetrics, box_iou, SegmentMetrics, mask_iou
 from ultralytics.yolo.utils.plotting import output_to_target, plot_images, Annotator, Colors
 from ultralytics.yolo.utils.torch_utils import de_parallel
 import torch.nn as nn
@@ -21,7 +21,7 @@ import contextlib
 class DetclsValidator(BaseValidator):
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
         super().__init__(dataloader, save_dir, pbar, args, _callbacks)
-        self.args.task = ''
+        self.args.task = 'multi'
         self.metrics = []
         self.class_map = [] 
         # if add lables_list in file yaml label can turn on 
@@ -34,7 +34,7 @@ class DetclsValidator(BaseValidator):
         # except:
         #     print("bug in here val.py in clsdet")
         self.metrics_det = DetMetrics(save_dir=self.save_dir, on_plot= self.on_plot)
-        self.metrics_cls = ClassifyMetrics(save_dir=self.save_dir, on_plot= self.on_plot)
+        self.metrics_cls = ClassifyMetrics()
         self.iouv = torch.linspace(0.5, 0.95, 10)  # iou vector for mAP@0.5:0.95
         self.niou = self.iouv.numel()
 
@@ -67,10 +67,13 @@ class DetclsValidator(BaseValidator):
 
     def get_desc_cls(self):
         return ("%22s" + "%11s" * 2) % ("classes", "top1_acc", "top5_acc")
+   
+    def get_desc_clsdet(self):
+        return("%22s" + "%11s" * 8) % ('Class', 'Images', 'Instances', 'Box(P', 'R', 'mAP50', 'mAP50-95)',"classes", "top1_acc", "top5_acc")
     
     def postprocess(self, preds):
         """Apply Non-maximum suppression to prediction outputs."""
-        return ops.non_max_suppression(
+        preds = ops.non_max_suppression(
             preds,
             self.args.conf,
             self.args.iou,
@@ -79,8 +82,10 @@ class DetclsValidator(BaseValidator):
             agnostic=self.args.single_cls or self.args.agnostic_nms,
             max_det=self.args.max_det,
         )
+        return preds
         
-    def update_metrics_det(self, preds, batch, task_name=None):
+        
+    def update_metrics(self, preds, batch, task_name=None):
             if self.args.combine_class:
                 for si, pred in enumerate(preds):
                     idx = batch['batch_idx'] == si

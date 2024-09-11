@@ -1,14 +1,11 @@
-path: ../dataset/multi_data
+path: ../data_multi
 train: train/images
 val: valid/images
-test: test/images 
 
 #have two object types_cars(van-mini)using classification and logo using detection
 # however i setup dataload with new format label : [cls1][cls2][bboxes] and cls1 is label for classify anf cls2 label for detection 
 
 name_1 : ['Audi', 'Honda', 'Hyundai', 'Mazda', 'Mercedes', 'Mitsubishi', 'Nissan', 'Toyota', 'Volkswagen', 'bmw', 'cadillac', 'chevrolet', 'ford', 'jeep', 'kia', 'lexus','mini', 'no class', 'porsche', 'range rover', 'subaru', 'suzuki', 'volvo']
-name_2 : 
-    0: Hatchback 
-    1: Sedan
-    2: Suv
-    3: Van 
+name_2 : ['Hatchback' ,'Sedan', 'Suv', 'Van'] 
+# name: ['Audi', 'Honda', 'Hyundai', 'Mazda', 'Mercedes', 'Mitsubishi', 'Nissan', 'Toyota', 'Volkswagen', 'bmw', 'cadillac', 'chevrolet', 'ford', 'jeep', 'kia', 'lexus','mini', 'no class', 'porsche', 'range rover', 'subaru', 'suzuki', 'volvo']
+
